@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏮我要中大獎</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root { --bg-dark: #8b0000; --sidebar-bg: rgba(0, 0, 0, 0.4); --primary-gold: #fbbf24; --text-light: #f8fafc; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: transparent !important; font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; color: var(--text-light); }
+        .bg-image { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-image: url('./ag.jpg') !important; background-size: cover; background-position: center center; z-index: -2; }
+        .app-container { display: grid; grid-template-columns: 1fr 350px; height: 100vh; width: 100vw; }
+        .side-panel { background: var(--sidebar-bg); backdrop-filter: blur(5px); border-left: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
+        .side-panel h3 { text-align: center; color: var(--primary-gold); font-size: 1.5rem; margin-bottom: 15px; border-bottom: 2px solid var(--primary-gold); padding-bottom: 10px; }
+        .history-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        .history-item { background: rgba(255,255,255,0.15); padding: 12px; border-radius: 10px; border-left: 4px solid var(--primary-gold); animation: slideIn 0.5s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        .history-item .p-name { color: white; font-weight: bold; font-size: 1.2rem; }
+        .history-item .p-prize { color: var(--primary-gold); font-size: 0.9rem; }
+        .main-content { display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        .main-title { font-size: 4rem; color: var(--primary-gold); margin-bottom: 1rem; text-shadow: 2px 2px 15px rgba(0, 0, 0, 0.8), 0 0 25px rgba(251, 191, 36, 0.5); font-weight: bold; }
+        .prize-select { font-size: 2rem; background: rgba(0, 0, 0, 0.5); color: var(--primary-gold); padding: 15px 50px; border-radius: 50px; border: 3px solid var(--primary-gold); outline: none; cursor: pointer; text-align: center; }
+        .rolling-box { font-size: 7rem; font-weight: 900; height: 180px; color: white; margin-bottom: 2rem; text-shadow: 2px 2px 30px rgba(0,0,0,0.8); }
+        .big-draw-btn { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; border: none; padding: 25px 80px; font-size: 2.5rem; font-weight: bold; border-radius: 20px; cursor: pointer; transition: 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .big-draw-btn:hover:not(:disabled) { transform: scale(1.05); filter: brightness(1.2); }
+        .big-draw-btn:disabled { background: #475569; opacity: 0.5; cursor: not-allowed; }
+        .top-controls { position: absolute; top: 20px; left: 20px; display: flex; gap: 10px; }
+        .control-btn { background: rgba(0,0,0,0.5); border: 1px solid var(--primary-gold); color: var(--primary-gold); padding: 10px 20px; border-radius: 8px; cursor: pointer; }
+        .download-btn { width: 100%; margin-bottom: 15px; background: rgba(251, 191, 36, 0.2); border: 1px dashed var(--primary-gold); color: var(--primary-gold); padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .winner-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 40px; }
+        .winner-title { font-size: 3.5rem; color: var(--primary-gold); margin-bottom: 30px; font-weight: bold; text-align: center; }
+        .winner-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; width: 100%; max-width: 1200px; justify-content: center; margin-bottom: 40px; overflow-y: auto; padding: 10px; }
+        .winner-card { background: linear-gradient(145deg, #b91c1c, #7f1d1d); border: 3px solid var(--primary-gold); border-radius: 20px; padding: 25px; text-align: center; color: white; animation: cardPop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 5000; }
+        .modal-content { background: white; color: #333; width: 600px; padding: 30px; border-radius: 20px; max-height: 90vh; overflow-y: auto; }
+        input, textarea { border: 1px solid #ccc; border-radius: 5px; padding: 8px; }
+    </style>
+</head>
+<body>
+
+    <div class="bg-image"></div>
+    
+    <!-- 音效區域 -->
+    <audio id="bgMusic" loop preload="auto">
+        <source src="https://www.bensound.com/bensound-music/bensound-ukulele.mp3" type="audio/mp3">
+    </audio>
+    <audio id="audioTension" loop preload="auto">
+        <source src="drum_roll.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="audioCheer" preload="auto">
+        <source src="success-fanfare-trumpets-6185.mp3" type="audio/mpeg">
+    </audio>
+
+    <div class="app-container">
+        <div class="main-content">
+            <div class="top-controls">
+                <button class="control-btn" onclick="toggleModal(true)">⚙️ 抽獎設定</button>
+                <button class="control-btn" id="btnSoundToggle" onclick="toggleSound()">🔊 音效：開</button>
+            </div>
+            
+            <div id="displayEventTitle" class="main-title"> 2026迎春聯歡抽獎 </div>
+            
+            <div style="margin-bottom: 2rem;">
+                <select id="prizeSelect" class="prize-select">
+                    <option value="">--請先設定獎項--</option>
+                </select>
+            </div>
+            
+            <div id="rollingName" class="rolling-box">恭喜發財</div>
+
+            <button id="btnStart" class="big-draw-btn" onclick="handleStartDraw()" disabled>開始抽取</button>
+            
+            <div style="margin-top: 40px; font-size: 1.4rem; font-weight: bold; text-shadow: 1px 1px 5px #000;">
+                待抽總人數：<span id="poolCountDisplay" style="color:var(--primary-gold);">0</span> 人
+            </div>
+        </div>
+
+        <div class="side-panel">
+            <h3>🏆 中獎名單總覽</h3>
+            <!-- 確保這裡有 id="btnDownload" -->
+            <button id="btnDownload" class="download-btn" onclick="downloadHistory()">下載名單並同步雲端</button>
+            <div id="historyFull" class="history-list"></div>
+        </div>
+    </div>
+
+    <!-- 設定彈窗 -->
+    <div id="modalOverlay" class="modal-overlay">
+        <div class="modal-content">
+            <h2 style="margin-top:0">⚙️ 抽獎設定</h2>
+            <label>1. 活動標題</label><br>
+            <input type="text" id="inputEventTitle" value=" 2026迎春聯歡抽獎 " style="width:95%; margin-bottom:15px;"><br>
+            <label>2. 參加者名單 (一人一行)</label><br>
+            <textarea id="inputNames" placeholder="請貼上名字..." style="width:95%; height:100px; margin-bottom:15px;"></textarea><br>
+            <div style="display: flex; gap: 15px; margin-bottom:15px;">
+                <div style="flex:1"><label>滾動秒數</label><br><input type="number" id="inputDrawSeconds" value="4" min="1" style="width:80%;"></div>
+                <div style="flex:1"><label>展示秒數 (0為手動)</label><br><input type="number" id="inputShowSeconds" value="0" min="0" style="width:80%;"></div>
+            </div>
+            <label>3. 設定獎項</label>
+            <div style="display:flex; gap:5px; margin-bottom:10px;">
+                <input type="text" id="prizeName" placeholder="如：二獎" style="flex:2;">
+                <input type="number" id="prizeCount" value="1" min="1" style="flex:1;">
+                <button onclick="addPrize()">新增</button>
+            </div>
+            <div id="prizeListDisplay" style="max-height:100px; overflow-y:auto; background:#f0f0f0; padding:10px; border-radius:5px; margin-bottom:15px;"></div>
+            <button onclick="saveSettings()" style="width:100%; padding:15px; background:#10b981; color:white; border:none; border-radius:10px; font-size:1.2rem; cursor:pointer;">儲存並套用</button>
+            <button onclick="toggleModal(false)" style="width:100%; margin-top:10px; background:none; border:none; color:#666; cursor:pointer;">取消</button>
+        </div>
+    </div>
+
+    <div id="winnerOverlay" class="winner-overlay">
+        <div id="winnerTitle" class="winner-title">🏆 恭喜中獎！</div>
+        <div id="winnerGrid" class="winner-grid"></div>
+        <button id="btnCloseWinner" class="big-draw-btn" style="font-size:1.5rem; padding:15px 50px;" onclick="closeWinnerOverlay()">確認並關閉</button>
+    </div>
+
+    <script>
+        // *** 重要：請在此替換成你部署後的 Google Apps Script 網址 ***
+    const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbw1-77SwOOQpR3ePxV_72CHy21QTz26HxUJtrXajYkUhlO2SwJVBBhWLs_1cM18AGf58w/exec";
+
+    let allNames = [];
+    let drawnHistory = [];
+    let prizeMap = [];
+    let isRolling = false;
+    let isSoundEnabled = true;
+    let drawDuration = 4;
+    let showDuration = 0;
+
+    const bgMusic = document.getElementById('bgMusic');
+    const audioTension = document.getElementById('audioTension');
+    const audioCheer = document.getElementById('audioCheer');
+
+    function toggleSound() {
+        isSoundEnabled = !isSoundEnabled;
+        document.getElementById('btnSoundToggle').innerText = isSoundEnabled ? '🔊 音效：開' : '🔇 音效：關';
+        if (!isSoundEnabled) { 
+            bgMusic.pause(); audioTension.pause(); audioCheer.pause(); 
+        } else { 
+            if (!isRolling) bgMusic.play().catch(e => {}); 
+        }
+    }
+
+    function unlockAudio() { 
+        if (isSoundEnabled) bgMusic.play().catch(e => {}); 
+    }
+
+    function toggleModal(show) { 
+        document.getElementById('modalOverlay').style.display = show ? 'flex' : 'none'; 
+    }
+
+    function addPrize() {
+        const name = document.getElementById('prizeName').value.trim();
+        const count = parseInt(document.getElementById('prizeCount').value);
+        if(name && count > 0) {
+            prizeMap.push({ name, count });
+            renderPrizeList();
+            document.getElementById('prizeName').value = '';
+            document.getElementById('prizeCount').value = 1;
+        }
+    }
+
+    function renderPrizeList() {
+        const container = document.getElementById('prizeListDisplay');
+        container.innerHTML = prizeMap.map((p, i) => `<div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span>${p.name} (共 ${p.count} 名)</span><button onclick="prizeMap.splice(${i},1); renderPrizeList();" style="color:red; border:none; background:none; cursor:pointer;">移除</button></div>`).join('');
+    }
+
+    function saveSettings() {
+        unlockAudio();
+        const rawNames = document.getElementById('inputNames').value;
+        allNames = rawNames.split('\n').map(n => n.trim()).filter(n => n);
+        drawDuration = parseInt(document.getElementById('inputDrawSeconds').value) || 4;
+        showDuration = parseInt(document.getElementById('inputShowSeconds').value) || 0;
+        document.getElementById('displayEventTitle').innerText = document.getElementById('inputEventTitle').value;
+        updatePrizeDropdown();
+        updateMainUI();
+        toggleModal(false);
+    }
+
+    function updatePrizeDropdown() {
+        const select = document.getElementById('prizeSelect');
+        if (prizeMap.length === 0) { select.innerHTML = '<option value="">-- 請先設定獎項 --</option>'; return; }
+        select.innerHTML = prizeMap.map((p, i) => `<option value="${i}">${p.name} (抽取 ${p.count} 名)</option>`).join('');
+    }
+
+    function updateMainUI() {
+        const currentPool = allNames.filter(n => !drawnHistory.some(h => h.name === n));
+        document.getElementById('poolCountDisplay').innerText = currentPool.length;
+        document.getElementById('btnStart').disabled = (prizeMap.length === 0 || currentPool.length === 0);
+    }
+
+    async function handleStartDraw() {
+        const select = document.getElementById('prizeSelect');
+        const prizeIndex = select.value;
+        if (isRolling || prizeIndex === "") return;
+        const selectedPrize = prizeMap[prizeIndex];
+        const currentPool = allNames.filter(n => !drawnHistory.some(h => h.name === n));
+        if (currentPool.length < selectedPrize.count) { alert(`剩餘名單不足！`); return; }
+
+        isRolling = true;
+        document.getElementById('btnStart').disabled = true;
+        if (isSoundEnabled) { bgMusic.pause(); audioTension.currentTime = 0; audioTension.play().catch(e=>{}); }
+
+        const rollingDisplay = document.getElementById('rollingName');
+        const startTime = Date.now();
+        const durationMs = drawDuration * 1000;
+
+        const runRolling = () => {
+            if (Date.now() - startTime < durationMs) {
+                rollingDisplay.innerText = currentPool[Math.floor(Math.random() * currentPool.length)];
+                requestAnimationFrame(runRolling);
+            } else { finalizeDraw(selectedPrize, currentPool, prizeIndex); }
+        };
+        requestAnimationFrame(runRolling);
+    }
+
+    function finalizeDraw(prize, pool, prizeIndex) {
+        audioTension.pause();
+        if (isSoundEnabled) { audioCheer.currentTime = 0; audioCheer.play().catch(e=>{}); }
+        const winners = [];
+        const tempPool = [...pool];
+        for (let i = 0; i < prize.count; i++) {
+            const name = tempPool.splice(Math.floor(Math.random() * tempPool.length), 1)[0];
+            winners.push(name);
+            const record = { name: name, prize: prize.name, synced: false };
+            drawnHistory.push(record);
+            updateHistoryPanel(record);
+        }
+        prizeMap.splice(prizeIndex, 1);
+        showWinnerOverlay(winners, prize.name);
+        isRolling = false;
+        document.getElementById('rollingName').innerText = "🎉 恭喜中獎！";
+        updatePrizeDropdown();
+        updateMainUI();
+        fireConfetti();
+    }
+
+    function updateHistoryPanel(record) {
+        const panel = document.getElementById('historyFull');
+        panel.insertAdjacentHTML('afterbegin', `<div class="history-item"><div class="p-name">${record.name}</div><div class="p-prize">${record.prize}</div></div>`);
+    }
+
+    async function downloadHistory() {
+        if (drawnHistory.length === 0) { alert("無紀錄可下載"); return; }
+        const btn = document.getElementById('btnDownload');
+        const eventTitle = document.getElementById('displayEventTitle').innerText;
+
+        // 1. 本地下載 TXT
+        let content = `--- ${eventTitle} 中獎名單 ---\r\n\r\n`;
+        drawnHistory.forEach((item, i) => { content += `${i + 1}. 【${item.prize}】 ${item.name}\r\n`; });
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = `中獎名單.txt`; a.click();
+        URL.revokeObjectURL(url);
+
+        // 2. 同步到雲端
+        // 修正後的檢查條件：如果網址還是原始範例或是空的，才不執行
+        if (!CLOUD_API_URL || CLOUD_API_URL.includes("YOUR_GAS_URL_HERE")) {
+            console.log("雲端 URL 未設定");
+            return;
+        }
+
+        const unsyncedData = drawnHistory.filter(item => !item.synced);
+        if (unsyncedData.length === 0) {
+            alert("✅ TXT 已下載！\n(雲端名單已是最新，無需重複同步)");
+            return;
+        }
+
+        btn.innerText = "同步雲端中...";
+        btn.disabled = true;
+
+        try {
+            // 使用 fetch 傳送資料
+            await fetch(CLOUD_API_URL, {
+                method: 'POST',
+                mode: 'no-cors', // 重要：對應 Google Apps Script
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: eventTitle, winners: unsyncedData })
+            });
+
+            // 成功後將狀態標記為已同步
+            unsyncedData.forEach(item => item.synced = true);
+            alert(`✅ 下載成功！\n雲端已新增 ${unsyncedData.length} 筆新名單。`);
+        } catch (error) {
+            console.error("同步失敗:", error);
+            alert("❌ 同步雲端失敗。");
+        } finally {
+            btn.innerText = "下載名單並同步雲端";
+            btn.disabled = false;
+        }
+    }
+
+    function showWinnerOverlay(winners, prizeName) {
+        const grid = document.getElementById('winnerGrid');
+        document.getElementById('winnerTitle').innerText = `🏆 恭喜獲得 【${prizeName}】`;
+        grid.innerHTML = winners.map((name, index) => `<div class="winner-card" style="animation-delay: ${index * 0.1}s"><div style="font-size:0.9rem; opacity:0.8;">幸運得主</div><div class="name" style="font-size: 2rem">${name}</div></div>`).join('');
+        document.getElementById('winnerOverlay').style.display = 'flex';
+    }
+
+    function closeWinnerOverlay() { 
+        document.getElementById('winnerOverlay').style.display = 'none'; 
+        audioCheer.pause(); 
+        if (isSoundEnabled) bgMusic.play().catch(e => {}); 
+    }
+
+    function fireConfetti() {
+        const end = Date.now() + 3000;
+        (function frame() {
+            confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#fbbf24', '#ffffff', '#ff0000'] });
+            confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#fbbf24', '#ffffff', '#ff0000'] });
+            if (Date.now() < end) requestAnimationFrame(frame);
+        }());
+    }
+    </script>
+</body>
+</html>
